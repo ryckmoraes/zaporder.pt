@@ -1,0 +1,53 @@
+# syntax=docker/dockerfile:1.7
+FROM node:20-bookworm-slim AS builder
+
+WORKDIR /app
+
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
+
+COPY package*.json ./
+RUN npm ci --legacy-peer-deps
+
+COPY . .
+RUN npx next build && test -d .next/standalone && mkdir -p .next/standalone/.next/static/chunks && cp -R .next/static/chunks/* .next/standalone/.next/static/chunks/
+
+
+FROM node:20-bookworm-slim AS runner
+
+WORKDIR /app
+
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends ca-certificates curl dumb-init \
+  && rm -rf /var/lib/apt/lists/*
+
+ENV NODE_ENV=production
+ENV PORT=3000
+ENV NEXT_TELEMETRY_DISABLED=1
+
+COPY --from=builder /app/package*.json ./
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/.next ./.next
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/app ./app
+COPY --from=builder /app/src ./src
+COPY --from=builder /app/i18n ./i18n
+COPY --from=builder /app/messages ./messages
+COPY --from=builder /app/data ./data
+COPY --from=builder /app/next.config.js ./next.config.js
+COPY --from=builder /app/middleware.ts ./middleware.ts
+COPY --from=builder /app/server.js ./server.js
+COPY --from=builder /app/boot.ts ./boot.ts
+COPY --from=builder /app/boot-worker.ts ./boot-worker.ts
+COPY --from=builder /app/load-secrets-root.ts ./load-secrets-root.ts
+COPY --from=builder /app/worker.cjs ./worker.cjs
+COPY --from=builder /app/worker-bundle.cjs ./worker-bundle.cjs
+
+EXPOSE 3000
+
+ENTRYPOINT ["dumb-init", "--"]
+CMD ["npx", "tsx", "boot.ts"]
+
+
+

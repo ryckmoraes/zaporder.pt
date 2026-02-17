@@ -1,0 +1,29 @@
+services:
+  app:
+    image: ${IMAGE_REPO:-zaporderx}:${IMAGE_TAG:-latest}
+    command: ["npx", "tsx", "boot.ts"]
+    env_file:
+      - ${ENV_FILE:-.env.production}
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      NEXT_TELEMETRY_DISABLED: 1
+      NODE_OPTIONS: --max-http-header-size=80000
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    restart: unless-stopped
+    volumes:
+      - ./data:/app/data
+
+  worker:
+    image: ${IMAGE_REPO:-zaporderx}:${IMAGE_TAG:-latest}
+    command: ["npx", "tsx", "boot-worker.ts"]
+    env_file:
+      - ${ENV_FILE:-.env.production}
+    environment:
+      NODE_ENV: production
+      NEXT_TELEMETRY_DISABLED: 1
+      NODE_OPTIONS: --max-http-header-size=80000
+    restart: unless-stopped
+    volumes:
+      - ./data:/app/data
